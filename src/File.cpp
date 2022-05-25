@@ -1,104 +1,99 @@
-#ifndef FILE_H
-#define FILE_H
-
-#include "INode.h"
+#include "File.h"
+#include "Utility.h"
+#include "User.h"
 
 /*
- * 打开文件控制块File类。
- * 该结构记录了进程打开文件
- * 的读、写请求类型，文件读写位置等等。
+ * 由于不需要实现kernel等内容，所以对于在kernel中定义的 g_BufferManager, g_FileSystem, g_user等内容，
+ * 直接在main中定义的全局变量来实现。
  */
-class File
+extern User g_User;
+
+/*==============================class File===================================*/
+File::File()
 {
-public:
-	/* Enumerate */
-	enum FileFlags
+	this->f_count = 0;
+	this->f_flag = 0;
+	this->f_offset = 0;
+	this->f_inode = NULL;
+}
+
+File::~File()
+{
+	//nothing to do here
+}
+
+/*==============================class OpenFiles===================================*/
+OpenFiles::OpenFiles()
+{
+}
+
+OpenFiles::~OpenFiles()
+{
+}
+
+int OpenFiles::AllocFreeSlot()
+{
+	int i;
+	User& u = g_User;
+
+	/* 注意c中不允许在循环中定义变量，C++中可以 */
+	for (i = 0; i < OpenFiles::NOFILES; i++)
 	{
-		FREAD = 0x1,			/* 读请求类型 */
-		FWRITE = 0x2,			/* 写请求类型 */
-		// FPIPE = 0x4				/* 没有用到PIPE	管道类型 */
-	};
+		/* 进程打开文件描述符表中找到空闲项，则返回之 */
+		if (this->ProcessOpenFileTable[i] == NULL)
+		{
+			/* 设置核心栈现场保护区中的EAX寄存器的值，即系统调用返回值 */
+			u.u_ar0[User::EAX] = i;
+			return i;
+		}
+	}
 
-	/* Functions */
-public:
-	/* Constructors */
-	File();
-	/* Destructors */
-	~File();
+	u.u_ar0[User::EAX] = -1;   /* Open1，需要一个标志。当打开文件结构创建失败时，可以回收系统资源*/
+	u.u_error = User::EMFILE;
+	return -1;
+}
 
-
-	/* Member */
-	unsigned int f_flag;		/* 对打开文件的读、写操作要求 */
-	int		f_count;			/* 当前引用该文件控制块的进程数量 */
-	Inode* f_inode;				/* 指向打开文件的内存Inode指针 */
-	int		f_offset;			/* 文件读写位置指针 */
-};
-
-
-/*
- * 进程打开文件描述符表(OpenFiles)的定义
- * 进程的u结构中包含OpenFiles类的一个对象，
- * 维护了当前进程的所有打开文件。
- */
-class OpenFiles
+File* OpenFiles::GetF(int fd)
 {
-	/* static members */
-public:
-	static const int NOFILES = 15;	/* 进程允许打开的最大文件数 */
+	File* pFile;
+	User& u = g_User;
 
-	/* Functions */
-public:
-	/* Constructors */
-	OpenFiles();
-	/* Destructors */
-	~OpenFiles();
+	/* 如果打开文件描述符的值超出了范围 */
+	if (fd < 0 || fd >= OpenFiles::NOFILES)
+	{
+		u.u_error = User::EBADF;
+		return NULL;
+	}
 
-	/*
-	 * @comment 进程请求打开文件时，在打开文件描述符表中分配一个空闲表项
-	 */
-	int AllocFreeSlot();
+	pFile = this->ProcessOpenFileTable[fd];
+	if (pFile == NULL)
+	{
+		u.u_error = User::EBADF;
+	}
 
-	/*
-	 * 不需要考虑文件描述符的复制（dup函数）
-	 * @comment Dup系统调用时复制打开文件描述符表中的描述符
-	 * int	Clone(int fd);
-	 */
+	return pFile;	/* 即使pFile==NULL也返回它，由调用GetF的函数来判断返回值 */
+}
 
-	/*
-	 * @comment 根据用户系统调用提供的文件描述符参数fd，
-	 * 找到对应的打开文件控制块File结构
-	 */
-	File* GetF(int fd);
-	/*
-	 * @comment 为已分配到的空闲描述符fd和已分配的打开文件表中
-	 * 空闲File对象建立勾连关系
-	 */
-	void SetF(int fd, File* pFile);
-
-	/* Members */
-private:
-	File* ProcessOpenFileTable[NOFILES];		/* File对象的指针数组，指向系统打开文件表中的File对象 */
-};
-
-/*
- * 文件I/O的参数类
- * 对文件读、写时需用到的读、写偏移量、
- * 字节数以及目标区域首地址参数。
- */
-class IOParameter
+void OpenFiles::SetF(int fd, File* pFile)
 {
-	/* Functions */
-public:
-	/* Constructors */
-	IOParameter();
-	/* Destructors */
-	~IOParameter();
+	if (fd < 0 || fd >= OpenFiles::NOFILES)
+	{
+		return;
+	}
+	/* 进程打开文件描述符指向系统打开文件表中相应的File结构 */
+	this->ProcessOpenFileTable[fd] = pFile;
+}
 
-	/* Members */
-public:
-	unsigned char* m_Base;	/* 当前读、写用户目标区域的首地址 */
-	int m_Offset;			/* 当前读、写文件的字节偏移量 */
-	int m_Count;			/* 当前还剩余的读、写字节数量 */
-};
+/*==============================class IOParameter===================================*/
+IOParameter::IOParameter()
+{
+	this->m_Base = 0;
+	this->m_Count = 0;
+	this->m_Offset = 0;
+}
 
-#endif
+IOParameter::~IOParameter()
+{
+	//nothing to do here
+}
+
