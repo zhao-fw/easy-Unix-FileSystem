@@ -17,19 +17,24 @@ public:
 		B_DONE = 0x4,		/* I/O操作结束 */
 		B_ERROR = 0x8,		/* I/O因出错而终止 */
 		B_BUSY = 0x10,		/* 相应缓存正在使用中 */
-		// 这里不需要进程相关内容 B_WANTED = 0x20,	/* 有进程正在等待使用该buf管理的资源，清B_BUSY标志时，要唤醒这种进程 */
+		B_WANTED = 0x20,	/* 有进程正在等待使用该buf管理的资源，清B_BUSY标志时，要唤醒这种进程 */
 		B_ASYNC = 0x40,		/* 异步I/O，不需要等待其结束 */
 		B_DELWRI = 0x80		/* 延迟写，在相应缓存要移做他用时，再将其内容写到相应块设备上 */
 	};
 
+	/* Functions */
+public:
+	void debugContent();
+	void debugMark();
+
+	void addFlag(BufFlag flag);
+	void delFlag(BufFlag flag);
+	void clrFlag();
+
 public:
 	unsigned int b_flags;	/* 缓存控制块标志位 */
 
-	int		padding;		/* 4字节填充，使得b_forw和b_back在Buf类中与Devtab类
-							 * 中的字段顺序能够一致，否则强制转换会出错。 */
-							 /* 缓存控制块队列勾连指针 */
-	Buf* b_forw;
-	Buf* b_back;
+	/* 缓存控制块队列勾连指针 */
 	Buf* av_forw;
 	Buf* av_back;
 
@@ -39,6 +44,8 @@ public:
 	int		b_blkno;		/* 磁盘逻辑块号 */
 	int		b_error;		/* I/O出错时信息 */
 	int		b_resid;		/* I/O出错时尚未传送的剩余字节数 */
+
+	int no;
 };
 
 #endif
