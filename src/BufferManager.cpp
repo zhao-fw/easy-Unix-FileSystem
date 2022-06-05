@@ -1,9 +1,7 @@
 #ifndef BUFFER_MANAGER_H
 #define BUFFER_MANAGER_H
 
-#include "Buf.h"
 #include "BufferManager.h"
-#include "Device.h"
 #include "Utility.h"
 #include <iostream>
 
@@ -44,7 +42,7 @@ void BufferManager::InitList() {
 		}
 
 		if (i == NBUF - 1) {
-			m_Buf->av_back = bFreeList;
+			m_Buf[i].av_back = bFreeList;
 			bFreeList->av_forw = m_Buf + i;
 		}
 		else {
@@ -56,7 +54,7 @@ void BufferManager::InitList() {
 }
 
 Buf* BufferManager::GetBlk(int blkno) {
-	Buf* bp;
+	Buf* bp = NULL;
 	bool find_it = false;
 	for (int i = 0; i < NBUF; ++i) {
 		if (m_Buf[i].b_blkno == blkno) {
@@ -64,15 +62,24 @@ Buf* BufferManager::GetBlk(int blkno) {
 			find_it = true;
 		}
 	}
+	
 	if (!find_it) {
 		if (bFreeList->av_back == bFreeList) {
-			std::cout << "ÎÞBuf¿ÉÓÃ" << std::endl;
-			return NULL;
+			for (int i = 0; i < NBUF; ++i) {
+				bp = m_Buf + i;
+				if (bp->b_flags & Buf::B_DELWRI) {
+					bp->delFlag(Buf::B_DELWRI);
+					m_device->WriteD(bp->b_addr, BUFFER_SIZE, bp->b_blkno * BUFFER_SIZE);
+					bp->b_blkno = blkno;
+					bp->clrFlag();
+					return bp;
+				}
+			}
 		}
 		bp = bFreeList->av_back;
 	}
 
-	if (bp->av_back != NULL) {
+	if (bp && bp->av_back != NULL) {
 		bp->av_forw->av_back = bp->av_back;
 		bp->av_back->av_forw = bp->av_forw;
 		bp->av_back = NULL;
@@ -101,8 +108,6 @@ void BufferManager::RelseB(Buf* bp) {
 Buf* BufferManager::ReadB(int blkno) {
 	Buf* bp = GetBlk(blkno);
 
-	bp->debugContent();
-
 	if (bp->b_flags & Buf::B_DONE) {
 		return bp;
 	}
@@ -112,8 +117,6 @@ Buf* BufferManager::ReadB(int blkno) {
 }
 
 void BufferManager::WriteB(Buf* bp) {
-	bp->debugContent();
-
 	bp->clrFlag();
 	m_device->WriteD(bp->b_addr, BUFFER_SIZE, bp->b_blkno * BUFFER_SIZE);
 	bp->addFlag(Buf::B_DONE);
@@ -121,7 +124,6 @@ void BufferManager::WriteB(Buf* bp) {
 }
 
 void BufferManager::DWriteB(Buf* bp) {
-	bp->debugContent();
 	bp->addFlag(Buf::B_DELWRI);
 	bp->addFlag(Buf::B_DONE);
 	this->RelseB(bp);
@@ -141,14 +143,6 @@ void BufferManager::FlushB() {
 			bp->addFlag(Buf::B_DONE);
 		}
 	}
-}
-
-void BufferManager::debug() {
-	using namespace std;
-	for (Buf* pb = bFreeList->av_back; pb != bFreeList; pb = pb->av_back) {
-		pb->debugMark();
-	}
-	cout << endl;
 }
 
 #endif

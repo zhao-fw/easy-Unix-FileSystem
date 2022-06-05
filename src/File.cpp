@@ -49,7 +49,7 @@ int OpenFiles::AllocFreeSlot()
 	}
 
 	u.u_ar0[User::EAX] = -1;   /* Open1，需要一个标志。当打开文件结构创建失败时，可以回收系统资源*/
-	u.u_error = User::EMFILE;
+	u.u_error = User::U_EMFILE;
 	return -1;
 }
 
@@ -61,14 +61,14 @@ File* OpenFiles::GetF(int fd)
 	/* 如果打开文件描述符的值超出了范围 */
 	if (fd < 0 || fd >= OpenFiles::NOFILES)
 	{
-		u.u_error = User::EBADF;
+		u.u_error = User::U_EBADF;
 		return NULL;
 	}
 
 	pFile = this->ProcessOpenFileTable[fd];
 	if (pFile == NULL)
 	{
-		u.u_error = User::EBADF;
+		u.u_error = User::U_EBADF;
 	}
 
 	return pFile;	/* 即使pFile==NULL也返回它，由调用GetF的函数来判断返回值 */

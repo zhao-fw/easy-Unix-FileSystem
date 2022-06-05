@@ -33,7 +33,6 @@ public:
 
 private:
     void InitList();
-    void debug();
 };
 
 #endif

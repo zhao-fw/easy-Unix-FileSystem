@@ -24,11 +24,11 @@ public:
 
 	/* Functions */
 public:
-	void debugContent();
-	void debugMark();
+	Buf();
+	~Buf();
 
-	void addFlag(BufFlag flag);
-	void delFlag(BufFlag flag);
+	void addFlag(Buf::BufFlag flag);
+	void delFlag(Buf::BufFlag flag);
 	void clrFlag();
 
 public:

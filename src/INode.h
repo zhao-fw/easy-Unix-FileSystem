@@ -19,24 +19,23 @@ public:
 	/* i_flag中标志位 */
 	enum INodeFlag
 	{
-		// ILOCK = 0x1,				/* 单用户		索引节点上锁 */
+		ILOCK = 0x1,	/* 单用户不需要			索引节点上锁 */
 		IUPD = 0x2,		/* 内存inode被修改过，需要更新相应外存inode */
 		IACC = 0x4,		/* 内存inode被访问过，需要修改最近一次访问时间 */
-		// IMOUNT = 0x8,			/* 单文件系统		内存inode用于挂载子文件系统 */
-		// IWANT = 0x10,			/* 单进程		有进程正在等待该内存inode被解锁，清ILOCK标志时，要唤醒这种进程 */
+		IMOUNT = 0x8,	/* 单文件系统不需要		内存inode用于挂载子文件系统 */
+		IWANT = 0x10,	/* 单进程不需要			有进程正在等待该内存inode被解锁，清ILOCK标志时，要唤醒这种进程 */
 		ITEXT = 0x20	/* 内存inode对应进程图像的正文段 */
 	};
-
 	/* static const member */
 	static const unsigned int IALLOC = 0x8000;		/* 文件被使用 */
 	static const unsigned int IFMT = 0x6000;		/* 文件类型掩码 */
 	static const unsigned int IFDIR = 0x4000;		/* 文件类型：目录文件 */
-	// static const unsigned int IFCHR = 0x2000;		/* 不涉及多设备 字符设备特殊类型文件 */
-	// static const unsigned int IFBLK = 0x6000;		/* 不涉及多设备 块设备特殊类型文件，为0表示常规数据文件 */
+	static const unsigned int IFCHR = 0x2000;		/* 不涉及多设备 字符设备特殊类型文件 */
+	static const unsigned int IFBLK = 0x6000;		/* 不涉及多设备 块设备特殊类型文件，为0表示常规数据文件 */
 	static const unsigned int ILARG = 0x1000;		/* 文件长度类型：大型或巨型文件 */
-	// static const unsigned int ISUID = 0x800;			/* 不需要用户信息 执行时文件时将用户的有效用户ID修改为文件所有者的User ID */
-	// static const unsigned int ISGID = 0x400;			/* 不需要用户信息 执行时文件时将用户的有效组ID修改为文件所有者的Group ID */
-	// static const unsigned int ISVTX = 0x200;			/* UnixV6++中没有找到使用的地方 使用后仍然位于交换区上的正文段 */
+	static const unsigned int ISUID = 0x800;			/* 不需要用户信息 执行时文件时将用户的有效用户ID修改为文件所有者的User ID */
+	static const unsigned int ISGID = 0x400;			/* 不需要用户信息 执行时文件时将用户的有效组ID修改为文件所有者的Group ID */
+	static const unsigned int ISVTX = 0x200;			/* UnixV6++中没有找到使用的地方 使用后仍然位于交换区上的正文段 */
 	static const unsigned int IREAD = 0x100;		/* 对文件的读权限 */
 	static const unsigned int IWRITE = 0x80;		/* 对文件的写权限 */
 	static const unsigned int IEXEC = 0x40;			/* 对文件的执行权限 */
@@ -63,10 +62,12 @@ public:
 	 * 的文件数据
 	 */
 	void ReadI();
+
 	/*
 	 * @comment 根据Inode对象中的物理磁盘块索引表，将数据写入文件
 	 */
 	void WriteI();
+
 	/*
 	 * @comment 将文件的逻辑块号转换成对应的物理盘块号
 	 */
@@ -76,6 +77,7 @@ public:
 	 * @comment 更新外存Inode的最后的访问时间、修改时间
 	 */
 	void UpdateI(int time);
+
 	/*
 	 * @comment 释放Inode对应文件占用的磁盘块
 	 */
@@ -85,6 +87,7 @@ public:
 	 * @comment 清空Inode对象中的数据
 	 */
 	void CleanI();
+
 	/*
 	 * @comment 将包含外存Inode字符块中信息（在buf中）拷贝到内存Inode中
 	 */

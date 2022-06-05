@@ -16,7 +16,7 @@ private:
     FILE* fp;
 
     /* 磁盘文件 */
-    const char* deviceFile = "device.img";
+    const char* deviceFile = "myDisk.img";
 
 public:
     Device();
@@ -26,7 +26,7 @@ public:
     bool Exist();
 
     /* 打开镜像文件 */
-    void OpenD();
+    void NewD();
 
     /* 实际写磁盘函数 */
     void WriteD(const void* buffer, unsigned int size, int offset = -1);

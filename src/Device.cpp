@@ -1,3 +1,5 @@
+#define _CRT_SECURE_NO_WARNINGS
+
 #include "Device.h"
 
 Device::Device()
@@ -7,7 +9,7 @@ Device::Device()
 	fclose(fp);
 
 	/* 以读写方式打开文件 */
-	fp = fopen(deviceFile, "r+");
+	fp = fopen(deviceFile, "rb+");
 }
 
 Device::~Device()
@@ -21,7 +23,7 @@ bool Device::Exist() {
 	return fp != NULL;
 }
 
-void Device::OpenD() {
+void Device::NewD() {
 	fp = fopen(deviceFile, "wb+");
 	if (fp == NULL) {
 		printf("打开或新建文件%s失败！", deviceFile);

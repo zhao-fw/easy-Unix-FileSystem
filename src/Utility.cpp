@@ -24,3 +24,26 @@ void Utility::DWordCopy(int* src, int* dst, int count)
 	}
 	return;
 }
+
+void Utility::StringCopy(char* src, char* dst)
+{
+	while ((*dst++ = *src++) != 0);
+}
+
+int Utility::StringLength(char* pString)
+{
+	int length = 0;
+	char* pChar = pString;
+
+	while (*pChar++)
+	{
+		length++;
+	}
+
+	/* ·µ»Ø×Ö·û´®³¤¶È */
+	return length;
+}
+
+time_t Utility::time(time_t* t) {
+	return ::time(t);
+}

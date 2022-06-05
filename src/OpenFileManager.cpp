@@ -1,119 +1,232 @@
-#ifndef OPEN_FILE_MANAGER_H
-#define OPEN_FILE_MANAGER_H
+#include "Utility.h"
+#include "OpenFileManager.h"
+#include "User.h"
 
-#include "INode.h"
-#include "File.h"
-#include "FileSystem.h"
+extern BufferManager g_BufferManager;
+extern FileSystem g_FileSystem;
+extern User g_User;
 
-/* Forward Declaration */
-class OpenFileTable;
-class InodeTable;
-
-/* 以下2个对象实例定义在OpenFileManager.cpp文件中 */
-extern InodeTable g_InodeTable;
+/*==============================class OpenFileTable===================================*/
+/* 系统全局打开文件表对象实例的定义 */
 extern OpenFileTable g_OpenFileTable;
 
-/*
- * 打开文件管理类(OpenFileManager)负责
- * 内核中对打开文件机构的管理，为进程
- * 打开文件建立内核数据结构之间的勾连
- * 关系。
- * 勾连关系指进程u区中打开文件描述符指向
- * 打开文件表中的File打开文件控制结构，
- * 以及从File结构指向文件对应的内存Inode。
- */
-class OpenFileTable
+OpenFileTable::OpenFileTable()
 {
-public:
-	/* static consts */
-	static const int NFILE = 100;	/* 打开文件控制块File结构的数量 */
+	//nothing to do here
+}
 
-	/* Functions */
-public:
-	/* Constructors */
-	OpenFileTable();
-	/* Destructors */
-	~OpenFileTable();
-
-	/*
-	 * @comment 在系统打开文件表中分配一个空闲的File结构
-	 */
-	File* AllocF();
-	/*
-	 * @comment 对打开文件控制块File结构的引用计数f_count减1，
-	 * 若引用计数f_count为0，则释放File结构。
-	 */
-	void CloseF(File* pFile);
-
-	/*
-	 * @comment 将所有的文件内容清空。
-	 * 学长的
-	*/
-	void Format();
-
-	/* Members */
-public:
-	File m_File[NFILE];			/* 系统打开文件表，为所有进程共享，进程打开文件描述符表
-								中包含指向打开文件表中对应File结构的指针。*/
-};
-
-/*
- * 内存Inode表(class InodeTable)
- * 负责内存Inode的分配和释放。
- */
-class InodeTable
+OpenFileTable::~OpenFileTable()
 {
-	/* static consts */
-public:
-	static const int NINODE = 100;	/* 内存Inode的数量 */
+	//nothing to do here
+}
 
-	/* Functions */
-public:
-	/* Constructors */
-	InodeTable();
-	/* Destructors */
-	~InodeTable();
+File* OpenFileTable::AllocF()
+{
+	int fd;
+	User& u = g_User;
 
-	/*
-	 * @comment 初始化对g_FileSystem对象的引用
-	 */
-	void Initialize();
-	/*
-	 * @comment 根据指定设备号dev，外存Inode编号获取对应
-	 * Inode。如果该Inode已经在内存中，对其上锁并返回该内存Inode，
-	 * 如果不在内存中，则将其读入内存后上锁并返回该内存Inode
-	 */
-	Inode* GetI(short dev, int inumber);
-	/*
-	 * @comment 减少该内存Inode的引用计数，如果此Inode已经没有目录项指向它，
-	 * 且无进程引用该Inode，则释放此文件占用的磁盘块。
-	 */
-	void PutI(Inode* pNode);
+	/* 在进程打开文件描述符表中获取一个空闲项 */
+	fd = u.u_ofiles.AllocFreeSlot();
 
-	/*
-	 * @comment 将所有被修改过的内存Inode更新到对应外存Inode中
-	 */
-	void UpdateInodeTable();
+	if (fd < 0)	/* 如果寻找空闲项失败 */
+	{
+		return NULL;
+	}
 
-	/*
-	 * @comment 检查设备dev上编号为inumber的外存inode是否有内存拷贝，
-	 * 如果有则返回该内存Inode在内存Inode表中的索引
-	 */
-	int IsLoaded(short dev, int inumber);
-	/*
-	 * @comment 在内存Inode表中寻找一个空闲的内存Inode
-	 */
-	Inode* GetFreeInode();
+	for (int i = 0; i < OpenFileTable::NFILE; i++)
+	{
+		/* f_count==0表示该项空闲 */
+		if (this->m_File[i].f_count == 0)
+		{
+			/* 建立描述符和File结构的勾连关系 */
+			u.u_ofiles.SetF(fd, &this->m_File[i]);
+			/* 增加对file结构的引用计数 */
+			this->m_File[i].f_count++;
+			/* 清空文件读、写位置 */
+			this->m_File[i].f_offset = 0;
+			return (&this->m_File[i]);
+		}
+	}
 
-	/*
-	 * @commet 将所有的Inode内容清空。
-	 * 学长的
-	*/
-	/* Members */
-public:
-	Inode m_Inode[NINODE];		/* 内存Inode数组，每个打开文件都会占用一个内存Inode */
+	printf("No Free File Struct\n");
+	u.u_error = User::U_ENFILE;
+	return NULL;
+}
 
-	FileSystem* m_FileSystem;	/* 对全局对象g_FileSystem的引用 */
-};
+void OpenFileTable::CloseF(File* pFile)
+{
+	if (pFile->f_count <= 1)
+	{
+		/*
+		 * 如果当前进程是最后一个引用该文件的进程
+		 */
+		g_InodeTable.PutI(pFile->f_inode);
+	}
 
-#endif
+	/* 引用当前File的进程数减1 */
+	pFile->f_count--;
+}
+
+void OpenFileTable::Format() {
+	File emptyFile;
+	for (int i = 0; i < OpenFileTable::NFILE; ++i) {
+		memcpy(m_File + i, &emptyFile, sizeof(File));
+	}
+}
+
+/*==============================class InodeTable===================================*/
+/*  定义内存Inode表的实例 */
+extern InodeTable g_InodeTable;
+
+InodeTable::InodeTable()
+{
+	//nothing to do here
+}
+
+InodeTable::~InodeTable()
+{
+	//nothing to do here
+}
+
+void InodeTable::Initialize()
+{
+	/* 获取对g_FileSystem的引用 */
+	this->m_FileSystem = &g_FileSystem;
+}
+
+void InodeTable::Format() {
+	Inode emptyINode;
+	for (int i = 0; i < InodeTable::NINODE; ++i) {
+		memcpy(m_Inode + i, &emptyINode, sizeof(Inode));
+	}
+}
+
+Inode* InodeTable::GetI(int inumber)
+{
+	Inode* pInode;
+	User& u = g_User;
+
+	while (true)
+	{
+		/* 检查编号为inumber的外存Inode是否有内存拷贝 */
+		int index = this->IsLoaded(inumber);
+		if (index >= 0)	/* 找到内存拷贝 */
+		{
+			pInode = &(this->m_Inode[index]);
+			pInode->i_count++;
+			return pInode;
+		}
+		else	/* 没有Inode的内存拷贝，则分配一个空闲内存Inode */
+		{
+			pInode = this->GetFreeInode();
+			/* 若内存Inode表已满，分配空闲Inode失败 */
+			if (NULL == pInode)
+			{
+				printf("Inode Table Overflow !\n");
+				u.u_error = User::U_ENFILE;
+				return NULL;
+			}
+			else	/* 分配空闲Inode成功，将外存Inode读入新分配的内存Inode */
+			{
+				/* 设置新的外存Inode编号，增加引用计数，对索引节点上锁 */
+				pInode->i_number = inumber;
+				pInode->i_count++;
+
+				BufferManager& bm = g_BufferManager;
+				/* 将该外存Inode读入缓冲区 */
+				Buf* pBuf = bm.ReadB(FileSystem::INODE_ZONE_START_SECTOR + inumber / FileSystem::INODE_NUMBER_PER_SECTOR);
+
+				/* 如果发生I/O错误 */
+				if (pBuf->b_flags & Buf::B_ERROR)
+				{
+					/* 释放缓存 */
+					bm.RelseB(pBuf);
+					/* 释放占据的内存Inode */
+					this->PutI(pInode);
+					return NULL;
+				}
+
+				/* 将缓冲区中的外存Inode信息拷贝到新分配的内存Inode中 */
+				pInode->CopyI(pBuf, inumber);
+				/* 释放缓存 */
+				bm.RelseB(pBuf);
+				return pInode;
+			}
+		}
+	}
+	return NULL;	/* GCC likes it! */
+}
+
+void InodeTable::PutI(Inode* pNode)
+{
+	/* 当前进程为引用该内存Inode的唯一进程，且准备释放该内存Inode */
+	if (pNode->i_count == 1)
+	{
+		/* 该文件已经没有目录路径指向它 */
+		if (pNode->i_nlink <= 0)
+		{
+			/* 释放该文件占据的数据盘块 */
+			pNode->TruncI();
+			pNode->i_mode = 0;
+			/* 释放对应的外存Inode */
+			this->m_FileSystem->FreeI(pNode->i_number);
+		}
+
+		/* 更新外存Inode信息 */
+		pNode->UpdateI((int)Utility::time(NULL));
+
+		/* 清除内存Inode的所有标志位 */
+		pNode->i_flag = 0;
+		/* 这是内存inode空闲的标志之一，另一个是i_count == 0 */
+		pNode->i_number = -1;
+	}
+
+	/* 减少内存Inode的引用计数，唤醒等待进程 */
+	pNode->i_count--;
+}
+
+void InodeTable::UpdateInodeTable()
+{
+	for (int i = 0; i < InodeTable::NINODE; i++)
+	{
+		/*
+		 * 如果Inode对象没有被上锁，即当前未被其它进程使用，可以同步到外存Inode；
+		 * 并且count不等于0，count == 0意味着该内存Inode未被任何打开文件引用，无需同步。
+		 */
+		if (this->m_Inode[i].i_count != 0)
+		{
+			/* 将内存Inode上锁后同步到外存Inode */
+			// this->m_Inode[i].i_flag |= Inode::ILOCK;
+			this->m_Inode[i].UpdateI((int)Utility::time(NULL));
+
+			/* 对内存Inode解锁 */
+			// this->m_Inode[i].Prele();
+		}
+	}
+}
+
+int InodeTable::IsLoaded(int inumber)
+{
+	/* 寻找指定外存Inode的内存拷贝 */
+	for (int i = 0; i < InodeTable::NINODE; i++)
+	{
+		if (this->m_Inode[i].i_number == inumber && this->m_Inode[i].i_count != 0)
+		{
+			return i;
+		}
+	}
+	return -1;
+}
+
+Inode* InodeTable::GetFreeInode()
+{
+	for (int i = 0; i < InodeTable::NINODE; i++)
+	{
+		/* 如果该内存Inode引用计数为零，则该Inode表示空闲 */
+		if (this->m_Inode[i].i_count == 0)
+		{
+			return &(this->m_Inode[i]);
+		}
+	}
+	return NULL;	/* 寻找失败 */
+}

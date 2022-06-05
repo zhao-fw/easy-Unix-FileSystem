@@ -54,7 +54,7 @@ void Inode::ReadI()
 	this->i_flag |= Inode::IACC;
 
 	/* 一次一个字符块地读入所需全部数据，直至遇到文件尾 */
-	while (User::NOERROR == u.u_error && u.u_IOParam.m_Count != 0)
+	while (User::U_NOERROR == u.u_error && u.u_IOParam.m_Count != 0)
 	{
 		lbn = bn = u.u_IOParam.m_Offset / Inode::BLOCK_SIZE;	/* addr的哪一个 */
 		offset = u.u_IOParam.m_Offset % Inode::BLOCK_SIZE;		/* 该addr对应块中的偏移量 */
@@ -85,7 +85,7 @@ void Inode::ReadI()
 		/* 缓存中数据起始读位置 */
 		unsigned char* start = pBuf->b_addr + offset;
 
-		/* 读操作: 从缓冲区拷贝到用户目标区
+		/* 读操作: 从缓冲区拷贝到用户目标区 */
 		Utility::ByteCopy(start, u.u_IOParam.m_Base, nbytes);
 
 		/* 用传送字节数nbytes更新读写位置 */
@@ -117,7 +117,7 @@ void Inode::WriteI()
 		return;
 	}
 
-	while (User::NOERROR == u.u_error && u.u_IOParam.m_Count != 0)
+	while (User::U_NOERROR == u.u_error && u.u_IOParam.m_Count != 0)
 	{
 		lbn = u.u_IOParam.m_Offset / Inode::BLOCK_SIZE;
 		offset = u.u_IOParam.m_Offset % Inode::BLOCK_SIZE;
@@ -150,16 +150,11 @@ void Inode::WriteI()
 		u.u_IOParam.m_Offset += nbytes;
 		u.u_IOParam.m_Count -= nbytes;
 
-		if (u.u_error != User::NOERROR)	/* 写过程中出错 */
+		if (u.u_error != User::U_NOERROR)	/* 写过程中出错 */
 		{
 			bufMgr.RelseB(pBuf);
 		}
-		else if ((u.u_IOParam.m_Offset % Inode::BLOCK_SIZE) == 0)	/* 如果写满一个字符块 */
-		{
-			/* 以异步方式将字符块写入磁盘，进程不需等待I/O操作结束，可以继续往下执行 */
-			bufMgr.AWriteB(pBuf);
-		}
-		else /* 如果缓冲区未写满 */
+		else
 		{
 			/* 将缓存标记为延迟写，不急于进行I/O操作将字符块输出到磁盘上 */
 			bufMgr.DWriteB(pBuf);
@@ -209,7 +204,7 @@ int Inode::Bmap(int lbn)
 	/* 超过该文件系统的最大块的大小 */
 	if (lbn >= Inode::HUGE_FILE_BLOCK)
 	{
-		u.u_error = User::EFBIG;
+		u.u_error = User::U_EFBIG;
 		return 0;
 	}
 
@@ -223,7 +218,7 @@ int Inode::Bmap(int lbn)
 		 * 文件进行扩充写入，就需要分配额外的磁盘块，并为之建立逻辑块号
 		 * 与物理盘块号之间的映射。
 		 */
-		if (phyBlkno == 0 && (pFirstBuf = fileSys.AllocB()) != NULL)
+		if (phyBlkno == 0 && (pFirstBuf = fileSys.AllocBlock()) != NULL)
 		{
 			/*
 			 * 将缓存标记为延迟写方式，这样可以减少系统的I/O操作。
@@ -256,7 +251,7 @@ int Inode::Bmap(int lbn)
 		{
 			this->i_flag |= Inode::IUPD;
 			/* 分配一空闲盘块存放间接索引表 */
-			if ((pFirstBuf = fileSys.AllocB()) == NULL)
+			if ((pFirstBuf = fileSys.AllocBlock()) == NULL)
 			{
 				return 0;	/* 分配失败 */
 			}
@@ -281,7 +276,7 @@ int Inode::Bmap(int lbn)
 			phyBlkno = iTable[index];
 			if (0 == phyBlkno)
 			{
-				if ((pSecondBuf = fileSys.AllocB()) == NULL)
+				if ((pSecondBuf = fileSys.AllocBlock()) == NULL)
 				{
 					/* 分配一次间接索引表磁盘块失败，释放缓存中的二次间接索引表，然后返回 */
 					bufMgr.RelseB(pFirstBuf);
@@ -316,7 +311,7 @@ int Inode::Bmap(int lbn)
 			index = (lbn - Inode::LARGE_FILE_BLOCK) % Inode::ADDRESS_PER_INDEX_BLOCK;
 		}
 
-		if ((phyBlkno = iTable[index]) == 0 && (pSecondBuf = fileSys.AllocB()) != NULL)
+		if ((phyBlkno = iTable[index]) == 0 && (pSecondBuf = fileSys.AllocBlock()) != NULL)
 		{
 			/* 将分配到的文件数据盘块号登记在一次间接索引表中 */
 			phyBlkno = pSecondBuf->b_blkno;
@@ -507,7 +502,6 @@ void Inode::CopyI(Buf* bp, int inumber)
 
 
 /*============================class DiskInode=================================*/
-
 DiskInode::DiskInode()
 {
 	/*
