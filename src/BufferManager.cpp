@@ -65,6 +65,7 @@ Buf* BufferManager::GetBlk(int blkno) {
 	
 	if (!find_it) {
 		if (bFreeList->av_back == bFreeList) {
+			/*
 			for (int i = 0; i < NBUF; ++i) {
 				bp = m_Buf + i;
 				if (bp->b_flags & Buf::B_DELWRI) {
@@ -75,6 +76,9 @@ Buf* BufferManager::GetBlk(int blkno) {
 					return bp;
 				}
 			}
+			*/
+			std::cout << "ÎÞBuf¿ÉÓÃ" << std::endl;
+			return NULL;
 		}
 		bp = bFreeList->av_back;
 	}

@@ -119,10 +119,10 @@ void man(std::string command) {
     static std::string write =
         "Command       :  write - 写入文件 \n"
         "Description   :  写入一个已经打开的文件中。 \n"
-        "Usage         :  write <file descriptor> <InFileName> <size> \n"
+        "Usage         :  write <file descriptor> <InFileName> [<size>] \n"
         "Parameter     :  <file descriptor> open返回的文件描述符 \n"
         "                 <InFileName> 指定写入内容为文件InFileName中的内容 \n"
-        "                 <size> 指定写入字节数，大小为 <size> \n"
+        "                 <size> 指定写入字节数，大小为 <size>, 如果不指定，则将文件的全部内容写入 \n"
         ;
 
     static std::string read =
